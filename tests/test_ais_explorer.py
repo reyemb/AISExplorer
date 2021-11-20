@@ -1,7 +1,7 @@
 import ais_explorer
 
-#print(ais_explorer.AIS.get_area_data(["EMED", "WMED"]))
+#print(aisexplorer.AIS.get_area_data(["EMED", "WMED"]))
 
-#print(ais_explorer.AIS.get_area_data("WMED"))
+#print(aisexplorer.AIS.get_area_data("WMED"))
 
-#print(ais_explorer.AIS.get_location(211281610))
+#print(aisexplorer.AIS.get_location(211281610))
