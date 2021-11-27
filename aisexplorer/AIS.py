@@ -134,7 +134,6 @@ class AIS:
 
         request_url = f"https://www.marinetraffic.com/en/reports?asset_type=vessels&columns={columns_url}&area_in={area_short}&time_of_latest_position_between=60,NaN"
         referer_url = f"https://www.marinetraffic.com/en/data/?asset_type=vessels&columns={columns_url}&area_in|in|{areas_long}|area_in={area_short}&time_of_latest_position_between|gte|time_of_latest_position_between=60,525600"
-
         self.session.headers['Referer'] = referer_url
 
         response = self.session.get(request_url)

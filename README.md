@@ -1,4 +1,5 @@
 # AISExplorer
+AISExplorer can be used to locate vessels or to scrape all vessely in an AREA
 
 ## Installation
 
@@ -19,6 +20,8 @@ get_location(211281610)
 ```
 
 ### Find vessels in Area
+
+**maximum 500 vessels**
 
 ```
 import aisexplorer
