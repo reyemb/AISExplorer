@@ -35,6 +35,12 @@ Output is limited to 500 rows.
 Add filters to Area Function
 Add docstrings to functions
 
+## Changelog
+
+###2021-11-27
+
+- Added Proxy Option
+
 
 
 
