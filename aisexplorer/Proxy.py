@@ -52,7 +52,7 @@ class FreeProxy:
                  https: Union[bool, str] = True,
                  prefered_country: Union[str, collections.abc.Iterable] = None,
                  prefered_country_code: Union[str, collections.abc.Iterable] = None,
-                 refresh_after: int = 900):
+                 refresh_after: int = 900, google: bool = False, verbose: bool = False):
         self.country = country
         self.country_code = country_code
         self.prefered_country = prefered_country
@@ -65,6 +65,12 @@ class FreeProxy:
         self.fetched_at = None
         self.refresh_after = refresh_after
         self.filtered_df = None
+        self.google = google
+        self.verbose = verbose
+
+    def verbose_print(self, message):
+        if self.verbose:
+            print(message)
 
     def series_to_proxy(self, series) -> dict:
         http_str = 'https' if self.https else 'http'
@@ -83,7 +89,7 @@ class FreeProxy:
                 if check_valid_ip(tr_element[0].text_content()) and tr_element[0].text_content() is not None:
                     dict_tmp = {}
                     for counter, attribute in enumerate(
-                            ['ip_address', 'port', ' country_code', 'country', 'anonymity', 'google', 'https',
+                            ['ip_address', 'port', 'country_code', 'country', 'anonymity', 'google', 'https',
                              'last_checked']):
                         dict_tmp[attribute] = tr_element[counter].text_content()
                     list_proxies.append(dict_tmp)
@@ -98,25 +104,23 @@ class FreeProxy:
     @staticmethod
     def get_filter_str(country: Union[str, collections.abc.Iterable],
                        country_code: Union[str, collections.abc.Iterable],
-                       anonymity: Union[str, collections.abc.Iterable], https: bool) -> str:
+                       anonymity: Union[str, collections.abc.Iterable], https: bool, google:bool) -> str:
         args = locals()
         filter_str = ""
-        for arg in []:
+        for arg in args:
             if arg == "https" and args[arg] == 'any':
                 continue
             if args[arg] is not None:
-                if arg is not None and isinstance(args[arg], bool):
+                if isinstance(args[arg], bool):
                     filter_str += f"(self.proxies['{arg}'] == {args[arg]})&"
-                if arg is not None and isinstance(args[arg], str):
+                if isinstance(args[arg], str):
                     filter_str += f"(self.proxies['{arg}'] == '{args[arg]}') & "
-                if arg is not None and isinstance(args[arg], collections.abc.Iterable) and not isinstance(arg,
-                                                                                                          (bytes, str)):
+                if isinstance(args[arg], collections.abc.Iterable) and not isinstance(args[arg],(bytes, str)):
                     filter_str += f"(self.proxies['{arg}'].isin({args[arg]})) &"
         if filter_str == "":
             return ""
         filter_str = filter_str[: len(filter_str) - 3] + filter_str[len(filter_str) - 3:].replace("&", "")
         return f"self.proxies[{filter_str}]"
-
 
     def find_working_proxy(self) -> dict:
         if self.filtered_df.empty:
@@ -148,20 +152,20 @@ class FreeProxy:
         except Exception:
             return False
 
-    def get(self):
-
+    def get(self) -> dict:
+        
         if self.proxies is None:
             self.get_proxy_list()
         elif time.time() - self.fetched_at >= self.refresh_after:
             self.get_proxy_list()
 
-        if self.prefered_country is not None:
-            filter_str = self.get_filter_str(self.prefered_country, self.prefered_country_code, self.anonym, self.https)
+        if self.prefered_country is not None or self.prefered_country_code is not None:
+            filter_str = self.get_filter_str(self.prefered_country, self.prefered_country_code, self.anonym, self.https, self.google)
         else:
-            filter_str = self.get_filter_str(self.country, self.country_code, self.anonym, self.https)
+            filter_str = self.get_filter_str(self.country, self.country_code, self.anonym, self.https, self.google)
 
         if filter_str != "":
-            exec(f"self.filtered_df = {filter_str}")
+            exec(f"self.filtered_df = {filter_str}.copy()")
         else:
             self.filtered_df = self.proxies
 
@@ -170,13 +174,13 @@ class FreeProxy:
             return working_proxy
 
         warnings.warn("For the prefered country no working proxies have been found. Checking Countries. If countries is None all countries will be checked")
-        if self.prefered_country is not None:
-            filter_str = self.get_filter_str(self.country, self.country_code, self.anonym, self.https)
+        if self.prefered_country is not None or self.prefered_country_code is not None:
+            filter_str = self.get_filter_str(self.country, self.country_code, self.anonym, self.https, self.google)
             if filter_str != "":
-                exec(f"self.filtered_df = {filter_str}")
+                exec(f"self.filtered_df = {filter_str}.copy()")
             else:
                 self.filtered_df = self.proxies
-            working_proxy = self.find_working_proxy(self.random, self.timeout, self.filtered_df, self.https)
+            working_proxy = self.find_working_proxy()
             if working_proxy is not None:
                 return working_proxy
 

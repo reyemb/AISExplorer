@@ -17,7 +17,10 @@ class AIS:
             'Vessel-Image': '005bf958a6548a79c6d3a42eba493e339624',
         })
         if proxy:
-            self.freeproxy = FreeProxy(proxy_config)
+            if proxy_config.get('proxy_config') is not None:
+                self.freeproxy = FreeProxy(**proxy_config.get('proxy_config'))
+            else:
+                self.freeproxy = FreeProxy()
             self.verbose_print("Searching for proxy...")
             self.session.proxies = self.freeproxy.get()
             self.verbose_print("Proxy found...")
