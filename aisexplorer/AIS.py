@@ -6,16 +6,34 @@ import json
 
 from aisexplorer.Exceptions import NotSupportedParameterTypeError, NotSupportedParameterError
 from aisexplorer.Proxy import FreeProxy
+from aisexplorer.Filters import Filters
+from tenacity import retry, stop_after_attempt, wait_fixed
 
 
 class AIS:
-    def __init__(self, proxy=False, verbose=False, **proxy_config):
+    retry_options = {
+        "stop": stop_after_attempt(3),
+        "wait": wait_fixed(15),
+    }
+    def __init__(self, proxy=False, verbose=False, columns="all", columns_excluded=None,
+                 num_retries=3, seconds_wait=15, filter_config=None, **proxy_config):
+        # Setting Retry Options
+        if num_retries != 3:
+            AIS.retry_options['stop'] = stop_after_attempt(num_retries)
+        if seconds_wait != 15:
+            AIS.retry_options['wait'] = wait_fixed(seconds_wait)
+
         self.verbose = verbose
+        self.columns = columns
+        self.columns_excluded = columns_excluded
         self.session = requests.Session()
+        if filter_config is not None:
+            self.filters = Filters(**filter_config)
         self.session.headers.update({
             'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:93.0) Gecko/20100101 Firefox/93.0',
             'Vessel-Image': '005bf958a6548a79c6d3a42eba493e339624',
         })
+        self.set_column_url()
         if proxy:
             if proxy_config.get('proxy_config') is not None:
                 self.freeproxy = FreeProxy(**proxy_config.get('proxy_config'))
@@ -25,6 +43,35 @@ class AIS:
             self.session.proxies = self.freeproxy.get()
             self.verbose_print("Proxy found...")
             self.proxy = proxy
+
+    def set_column_url(self):
+        possible_columns = ["time_of_latest_position", "flag", "shipname", "photo", "recognized_next_port", "reported_eta", "reported_destination", "current_port", "imo", "mmsi", "ship_type", "show_on_live_map", "area", "area_local", "lat_of_latest_position", "lon_of_latest_position", "fleet", "status", "eni", "speed", "course", "draught", "navigational_status", "year_of_build", "length", "width", "dwt", "current_port_unlocode", "current_port_country", "callsign"]
+        if self.columns != "all":
+            columns_selected = self.columns
+        else:
+            columns_selected = possible_columns
+
+        if self.columns_excluded is not None:
+            if isinstance(self.columns_excluded, str) or isinstance(self.columns_excluded, collections.abc.Iterable):
+                if isinstance(self.columns_excluded, str):
+                    try:
+                        columns_selected.remove(self.columns_excluded)
+                    except ValueError:
+                        raise NotSupportedParameterError("exclude",possible_columns, columns_excluded)
+                if isinstance(self.columns_excluded, collections.abc.Iterable) and not isinstance(columns_excluded, (str, bytes)):
+                    for element in self.columns_excluded:
+                        try:
+                            possible_columns.remove(element)
+                        except ValueError:
+                            raise NotSupportedParameterError("exclude", possible_columns, element)
+            else:
+                raise NotSupportedParameterTypeError("exclude", "collections.abc.Iterable or str", type(columns_excluded))
+
+        if isinstance(columns_selected, str):
+            columns_url = columns_selected
+        else:
+            columns_url = ",".join(columns_selected)
+        self.columns_url = columns_url
 
     def verbose_print(self, message):
         if self.verbose:
@@ -43,7 +90,8 @@ class AIS:
         self.session.proxies = self.freeproxy.get()
         self.verbose_print("Proxy found...")
 
-    def get_area_data(self, area, columns="all", columns_excluded=None, return_df=False):
+    @retry(**retry_options)
+    def get_area_data(self, area, return_df=False):
         possible_areas = {
             "ADRIA":	"Adriatic Sea",
             "AG":	"Arabian Sea",
@@ -96,33 +144,6 @@ class AIS:
             "WCSA":	"West South America",
             "WMED":	"West Mediterranean"
         }
-        possible_columns = ["time_of_latest_position", "flag", "shipname", "photo", "recognized_next_port", "reported_eta", "reported_destination", "current_port", "imo", "mmsi", "ship_type", "show_on_live_map", "area", "area_local", "lat_of_latest_position", "lon_of_latest_position", "fleet", "status", "eni", "speed", "course", "draught", "navigational_status", "year_of_build", "length", "width", "dwt", "current_port_unlocode", "current_port_country", "callsign"]
-        if columns != "all":
-            columns_selected = columns
-        else:
-            columns_selected = possible_columns
-
-        if columns_excluded is not None:
-            if isinstance(columns_excluded, str) or isinstance(columns_excluded, collections.abc.Iterable):
-                if isinstance(columns_excluded, str):
-                    try:
-                        columns_selected.remove(columns_excluded)
-                    except ValueError:
-                        raise NotSupportedParameterError("exclude",possible_columns, columns_excluded)
-                if isinstance(columns_excluded, collections.abc.Iterable) and not isinstance(columns_excluded, (str, bytes)):
-                    for element in columns_excluded:
-                        try:
-                            possible_columns.remove(element)
-                        except ValueError:
-                            raise NotSupportedParameterError("exclude", possible_columns, element)
-            else:
-                raise NotSupportedParameterTypeError("exclude", "collections.abc.Iterable or str", type(columns_excluded))
-
-        if isinstance(columns_selected, str):
-            columns_url = columns_selected
-        else:
-            columns_url = ",".join(columns_selected)
-
         if isinstance(area, str):
             if area not in possible_areas.keys():
                 raise NotSupportedParameterError("area", possible_areas.keys, area)
@@ -135,8 +156,8 @@ class AIS:
             areas_long = ",".join([urllib.parse.quote_plus(possible_areas[element]) for element in area])
             area_short = ",".join(area)
 
-        request_url = f"https://www.marinetraffic.com/en/reports?asset_type=vessels&columns={columns_url}&area_in={area_short}&time_of_latest_position_between=60,NaN"
-        referer_url = f"https://www.marinetraffic.com/en/data/?asset_type=vessels&columns={columns_url}&area_in|in|{areas_long}|area_in={area_short}&time_of_latest_position_between|gte|time_of_latest_position_between=60,525600"
+        request_url = f"https://www.marinetraffic.com/en/reports?asset_type=vessels&columns={self.columns_url}&area_in|in|{areas_long}|area_in={area_short}"
+        referer_url = f"https://www.marinetraffic.com/en/data/?asset_type=vessels&columns={self.columns_url}&area_in|in|{areas_long}|area_in={area_short}"
         self.session.headers['Referer'] = referer_url
 
         response = self.session.get(request_url)
@@ -150,38 +171,13 @@ class AIS:
         else:
             return response.text
 
-    def get_location(self, mmsi, columns="all", columns_excluded=None, return_df=False):
+    @retry(**retry_options)
+    def get_location(self, mmsi, return_df=False):
         if isinstance(mmsi, int):
             mmsi = str(mmsi)
-        possible_columns = ["time_of_latest_position", "flag", "shipname", "photo", "recognized_next_port", "reported_eta", "reported_destination", "current_port", "imo", "mmsi", "ship_type", "show_on_live_map", "area", "area_local", "lat_of_latest_position", "lon_of_latest_position", "fleet", "status", "eni", "speed", "course", "draught", "navigational_status", "year_of_build", "length", "width", "dwt", "current_port_unlocode", "current_port_country", "callsign"]
-        if columns != "all":
-            columns_selected = columns
-        else:
-            columns_selected = possible_columns
 
-        if columns_excluded is not None:
-            if isinstance(columns_excluded, str) or isinstance(columns_excluded, collections.abc.Iterable):
-                if isinstance(columns_excluded, str):
-                    try:
-                        columns_selected.remove(columns_excluded)
-                    except ValueError:
-                        raise NotSupportedParameterError("exclude",possible_columns, columns_excluded)
-                if isinstance(columns_excluded, collections.abc.Iterable) and not isinstance(columns_excluded, (str, bytes)):
-                    for element in columns_excluded:
-                        try:
-                            possible_columns.remove(element)
-                        except ValueError:
-                            raise NotSupportedParameterError("exclude", possible_columns, element)
-            else:
-                raise NotSupportedParameterTypeError("exclude", "collections.abc.Iterable or str", type(columns_excluded))
-
-        if isinstance(columns_selected, str):
-            columns_url = columns_selected
-        else:
-            columns_url = ",".join(columns_selected)
-
-        request_url = f"https://www.marinetraffic.com/en/reports?asset_type=vessels&columns={columns_url}&mmsi|eq|mmsi={mmsi}"
-        referer_url = f"https://www.marinetraffic.com/en/data/?asset_type=vessels&columns={columns_url}&mmsi|eq|mmsi={mmsi}"
+        request_url = f"https://www.marinetraffic.com/en/reports?asset_type=vessels&columns={self.columns_url}&mmsi|eq|mmsi={mmsi}"
+        referer_url = f"https://www.marinetraffic.com/en/data/?asset_type=vessels&columns={self.columns_url}&mmsi|eq|mmsi={mmsi}"
 
         self.session.headers['Referer'] = referer_url
 
@@ -195,3 +191,10 @@ class AIS:
         else:
             return response.text
 
+    def get_data(self):
+        pass
+
+    @retry(stop=stop_after_attempt(7))
+    def stop_after_7_attempts(self):
+        print("Stopping after 7 attempts")
+        raise Exception

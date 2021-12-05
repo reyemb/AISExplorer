@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "AISExplorer"
-version = "0.0.2"
+version = "0.0.3"
 description = "Wrapper to fetch data from marinetraffic"
 readme = "README.md"
 homepage = "https://github.com/reyemb/AISExplorer"
@@ -13,6 +13,7 @@ python = "^3.6"
 pandas = "^1.3.4"
 requests = "^2.26.0"
 lxml = "^4.6.4"
+tenacity = "^8.0.1"
 
 [tool.poetry.dev-dependencies]
 readme-renderer = "^30.0"

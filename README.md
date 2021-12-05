@@ -42,6 +42,12 @@ Output is limited to 500 rows.
 
 ## Changelog
 
+### 2021-12-5
+
+- Added Filters early stage
+- Added Retry Options
+- Added some new exceptions
+
 ### 2021-11-27
 
 - Added Proxy Option
