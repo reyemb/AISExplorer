@@ -15,18 +15,16 @@ from aisexplorer.Utils.Utility import set_types_df
 #print(Filters(mmsi=3812, dwt=[1, 2]).to_query())
 
 # Check filters
-print(Filters(mmsi=3812).to_query())
+print(Filters(latest_report= [360, 525600]).to_query())
 
 print(Filters(vessel_name="A").to_query(ignore_filter='vessel_name'))
 
-df = AIS(verbose=True, return_df=True, return_total_count=True, print_query=True ,filter_config={
-    'vessel_name': 'A'
-}).get_area_data("WMED")[0]
+df, total_count = AIS(verbose=True, return_df=True, return_total_count=True, print_query=True ,filter_config={
+    'vessel_name': 'A',
+    'latest_report': [360, 525600],
+}).get_area_data("WMED")
 
-print(df.info())
+print(df)
+print(total_count)
 
-df_new = set_types_df(df)
-
-print(df_new.info())
-
-AIS(num_retries=12, verbose=True).test_retry()
+print("|" == "|")

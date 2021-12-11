@@ -199,7 +199,8 @@ class AIS:
                       f"&area_in|in|{areas_long}|area_in={area_short}{self.filters.to_query(ignore_filter='global_area')}"
         referer_url = f"https://www.marinetraffic.com/en/data/?asset_type=vessels&columns={self.columns_url}" \
                       f"&area_in|in|{areas_long}|area_in={area_short}{self.filters.to_query(ignore_filter='global_area')}"
-        self.query_print(referer_url)
+        self.query_print("referer_url: " + referer_url)
+        self.query_print("request_url: " + request_url)
         return self.return_response(request_url, referer_url)
 
     @retry(**retry_options)
@@ -210,7 +211,8 @@ class AIS:
                       f"&mmsi|eq|mmsi={mmsi}{self.filters.to_query(ignore_filter='mmsi')}"
         referer_url = f"https://www.marinetraffic.com/en/data/?asset_type=vessels&columns={self.columns_url}" \
                       f"&mmsi|eq|mmsi={mmsi}{self.filters.to_query(ignore_filter='mmsi')}"
-        self.query_print(referer_url)
+        self.query_print("referer_url: " + referer_url)
+        self.query_print("request_url: " + request_url)
         return self.return_response(request_url, referer_url)
 
     @retry(**retry_options)

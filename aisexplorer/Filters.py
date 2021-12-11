@@ -56,11 +56,11 @@ class SliderFilter:
 
     def to_query(self):
         if self.key == 'latest_report':
-            return f"&{self.key}|gte|{self.key}={self.value[0], self.value[1]}"
+            return f"&{self.dict_var[self.key]}|gte|{self.dict_var[self.key]}={','.join(self.value)}"
         elif self.key == 'course':
-            return f"&{self.key}|range_circle|{self.key}={self.value[0], self.value[1]}"
+            return f"&{self.dict_var[self.key]}|range_circle|{self.dict_var[self.key]}={','.join(self.value)}"
         else:
-            return f"&{self.key}|range|{self.key}={self.value[0], self.value[1]}"
+            return f"&{self.dict_var[self.key]}|range|{self.dict_var[self.key]}={','.join(self.value)}"
 
 
 class IntFilter:
@@ -98,9 +98,12 @@ class ListFilter:
                           "to filter for elements which are not in the list use a dict instead")
             self.value = value
             self.operator = "in"
+        elif isinstance(value, str):
+            self.value = value
+            self.operator = "in"
         else:
             self.value = value['values']
-            self.value = value['operator']
+            self.operator = value['operator']
         self.key = key
 
     def to_query(self):
