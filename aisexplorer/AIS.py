@@ -3,26 +3,52 @@ import pandas as pd
 import urllib
 import collections
 import json
+import lxml.html as lh
 
-from aisexplorer.Exceptions import NotSupportedParameterTypeError, NotSupportedParameterError
+from requests.exceptions import ConnectionError
+from aisexplorer.Exceptions import NotSupportedParameterTypeError, NotSupportedParameterError, NoResultsError, \
+    CloudflareError
 from aisexplorer.Proxy import FreeProxy
 from aisexplorer.Filters import Filters
 from tenacity import retry, stop_after_attempt, wait_fixed
 
 
+def before_retry(retry_state):
+    object = retry_state.args[0]
+    if object.proxy:
+        object.verbose_print(retry_state.outcome.result)
+        object.verbose_print("Renewing Proxy and trying again in 15 seconds")
+        object.renew_proxy()
+    else:
+        object.verbose_print("Retrying again in 15 seconds")
+
+
+def error_callback(retry_state):
+    raise NoResultsError(f"After {str(retry_state.attempt_number)} Attempts still no results are given. "
+                         f"If you think this is an Error in the module raise an Issue at "
+                         f"https://github.com/reyemb/AISExplorer ")
+
+
 class AIS:
     retry_options = {
-        "stop": stop_after_attempt(3),
+        "stop": stop_after_attempt(7),
         "wait": wait_fixed(15),
+        "after": before_retry,
+        "retry_error_callback": error_callback
     }
     def __init__(self, proxy=False, verbose=False, columns="all", columns_excluded=None,
-                 num_retries=3, seconds_wait=15, filter_config=None, **proxy_config):
+                 num_retries=7, seconds_wait=15, filter_config=None, return_df=False, return_total_count=False,
+                 **proxy_config):
         # Setting Retry Options
-        if num_retries != 3:
+        print(AIS.retry_options['stop'].max_attempt_number)
+        if num_retries != 7:
             AIS.retry_options['stop'] = stop_after_attempt(num_retries)
         if seconds_wait != 15:
             AIS.retry_options['wait'] = wait_fixed(seconds_wait)
+        print(AIS.retry_options['stop'].max_attempt_number)
 
+        self.return_df = return_df
+        self.return_total_count = return_total_count
         self.verbose = verbose
         self.columns = columns
         self.columns_excluded = columns_excluded
@@ -43,9 +69,17 @@ class AIS:
             self.session.proxies = self.freeproxy.get()
             self.verbose_print("Proxy found...")
             self.proxy = proxy
+            self.burned_proxies = []
+        else:
+            self.proxy = False
 
     def set_column_url(self):
-        possible_columns = ["time_of_latest_position", "flag", "shipname", "photo", "recognized_next_port", "reported_eta", "reported_destination", "current_port", "imo", "mmsi", "ship_type", "show_on_live_map", "area", "area_local", "lat_of_latest_position", "lon_of_latest_position", "fleet", "status", "eni", "speed", "course", "draught", "navigational_status", "year_of_build", "length", "width", "dwt", "current_port_unlocode", "current_port_country", "callsign"]
+        possible_columns = ["time_of_latest_position", "flag", "shipname", "photo", "recognized_next_port",
+                            "reported_eta", "reported_destination", "current_port", "imo", "mmsi", "ship_type",
+                            "show_on_live_map", "area", "area_local", "lat_of_latest_position",
+                            "lon_of_latest_position", "fleet", "status", "eni", "speed", "course", "draught",
+                            "navigational_status", "year_of_build", "length", "width", "dwt", "current_port_unlocode",
+                            "current_port_country", "callsign"]
         if self.columns != "all":
             columns_selected = self.columns
         else:
@@ -57,15 +91,17 @@ class AIS:
                     try:
                         columns_selected.remove(self.columns_excluded)
                     except ValueError:
-                        raise NotSupportedParameterError("exclude",possible_columns, columns_excluded)
-                if isinstance(self.columns_excluded, collections.abc.Iterable) and not isinstance(columns_excluded, (str, bytes)):
+                        raise NotSupportedParameterError("exclude", possible_columns, self.columns_excluded)
+                if isinstance(self.columns_excluded, collections.abc.Iterable) and \
+                        not isinstance(self.columns_excluded, (str, bytes)):
                     for element in self.columns_excluded:
                         try:
                             possible_columns.remove(element)
                         except ValueError:
                             raise NotSupportedParameterError("exclude", possible_columns, element)
             else:
-                raise NotSupportedParameterTypeError("exclude", "collections.abc.Iterable or str", type(columns_excluded))
+                raise NotSupportedParameterTypeError("exclude", "collections.abc.Iterable or str",
+                                                     type(self.columns_excluded))
 
         if isinstance(columns_selected, str):
             columns_url = columns_selected
@@ -86,12 +122,12 @@ class AIS:
                 self.verbose_print("Proxy found...")
 
     def renew_proxy(self):
-        self.verbose_print("Looking for new ...")
+        self.verbose_print("Looking for new proxy...")
         self.session.proxies = self.freeproxy.get()
         self.verbose_print("Proxy found...")
 
     @retry(**retry_options)
-    def get_area_data(self, area, return_df=False):
+    def get_area_data(self, area):
         possible_areas = {
             "ADRIA":	"Adriatic Sea",
             "AG":	"Arabian Sea",
@@ -156,45 +192,57 @@ class AIS:
             areas_long = ",".join([urllib.parse.quote_plus(possible_areas[element]) for element in area])
             area_short = ",".join(area)
 
-        request_url = f"https://www.marinetraffic.com/en/reports?asset_type=vessels&columns={self.columns_url}&area_in|in|{areas_long}|area_in={area_short}"
-        referer_url = f"https://www.marinetraffic.com/en/data/?asset_type=vessels&columns={self.columns_url}&area_in|in|{areas_long}|area_in={area_short}"
-        self.session.headers['Referer'] = referer_url
-
-        response = self.session.get(request_url)
-        self.verbose_print(f"Used proxy: {self.session.proxies}")
-
-        if response.status_code == 200:
-            if return_df:
-                return pd.DataFrame(json.loads(response.text)["data"])
-            else:
-                return json.loads(response.text)["data"]
-        else:
-            return response.text
+        request_url = f"https://www.marinetraffic.com/en/reports?asset_type=vessels&columns={self.columns_url}" \
+                      f"&area_in|in|{areas_long}|area_in={area_short}{self.filters.to_query(ignore_filter='global_area')}"
+        referer_url = f"https://www.marinetraffic.com/en/data/?asset_type=vessels&columns={self.columns_url}" \
+                      f"&area_in|in|{areas_long}|area_in={area_short}{self.filters.to_query(ignore_filter='global_area')}"
+        return self.return_response(request_url, referer_url)
 
     @retry(**retry_options)
-    def get_location(self, mmsi, return_df=False):
+    def get_location(self, mmsi):
         if isinstance(mmsi, int):
             mmsi = str(mmsi)
+        filter_str = self.filters.to_query('')
+        request_url = f"https://www.marinetraffic.com/en/reports?asset_type=vessels&columns={self.columns_url}" \
+                      f"&mmsi|eq|mmsi={mmsi}{self.filters.to_query(ignore_filter='mmsi')}"
+        referer_url = f"https://www.marinetraffic.com/en/data/?asset_type=vessels&columns={self.columns_url}" \
+                      f"&mmsi|eq|mmsi={mmsi}{self.filters.to_query(ignore_filter='mmsi')}"
+        return self.return_response(request_url, referer_url)
 
-        request_url = f"https://www.marinetraffic.com/en/reports?asset_type=vessels&columns={self.columns_url}&mmsi|eq|mmsi={mmsi}"
-        referer_url = f"https://www.marinetraffic.com/en/data/?asset_type=vessels&columns={self.columns_url}&mmsi|eq|mmsi={mmsi}"
+    @retry(**retry_options)
+    def get_data_by_url(self, url):
+        referer_url = url
+        request_url = url.replace("data", "reports")
+        return self.return_response(request_url, referer_url)
 
+    def return_response(self, request_url, referer_url):
         self.session.headers['Referer'] = referer_url
-
-        response = self.session.get(request_url)
+        try:
+            response = self.session.get(request_url)
+        except ConnectionError as ce:
+            self.verbose_print('Proxy has died. Looking for new proxy...')
+            raise ce
+        self.check_response_cloudflare(response)
         self.verbose_print(f"Used proxy: {self.session.proxies}")
         if response.status_code == 200:
-            if return_df:
-                return pd.DataFrame(json.loads(response.text)["data"])
+            if self.return_df:
+                if self.return_total_count:
+                    return pd.DataFrame(json.loads(response.text)["data"]), json.loads(response.text)["totalCount"]
+                else:
+                    return pd.DataFrame(json.loads(response.text)["data"])
             else:
-                return json.loads(response.text)["data"]
+                if self.return_total_count:
+                    return json.loads(response.text)["data"], json.loads(response.text)["totalCount"]
+                else:
+                    return json.loads(response.text)["data"]
         else:
             return response.text
 
-    def get_data(self):
-        pass
-
-    @retry(stop=stop_after_attempt(7))
-    def stop_after_7_attempts(self):
-        print("Stopping after 7 attempts")
-        raise Exception
+    def check_response_cloudflare(self, response):
+        doc = lh.fromstring(response.content)
+        titles = doc.xpath('//title')
+        if titles:
+            title = titles[0].text_content()
+            if "Cloudflare" in title:
+                self.verbose_print(f"Cloudflare has detected unusual behavior. Changing Proxy...")
+                raise CloudflareError()

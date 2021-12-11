@@ -1,5 +1,5 @@
 # AISExplorer
-AISExplorer can be used to locate vessels or to scrape all vessely in an AREA. 
+AISExplorer can be used to locate vessels or to scrape all vessel in an AREA. 
 Also free proxies can be used out of the box.
 
 ## Installation
@@ -36,11 +36,15 @@ Output is limited to 500 rows.
 
 ## Next Steps
 
-- Add filters to Area Function
-- Add Fallbacks if proxies has died
-- Add docstrings to functions
+- Add more potential proxy lists
 
 ## Changelog
+
+### 2021-12-10
+
+- Added Fallback if proxy has died
+- Added get data by url
+- Added Check if requests was filtered by cloudflare
 
 ### 2021-12-5
 

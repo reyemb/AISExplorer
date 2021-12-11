@@ -20,15 +20,15 @@ class StrFilter:
 
     def to_query(self):
         if self.key == 'vessel_name':
-            return f"{self.key}|begins|{self.key}={self.value[0], self.value[1]}"
+            return f"&{self.dict_var[self.key]}|begins|{self.dict_var[self.key]}={self.value}"
         elif self.key == 'recognized_next_port_in':
-            return f"{self.key}|begins|{self.key}_name={self.value[0], self.value[1]}"
+            return f"&{self.dict_var[self.key]}|begins|{self.dict_var[self.key]}_name={self.value}"
         elif self.key == 'callsign':
-            return f"{self.key}|eq|{self.key}={self.value[0], self.value[1]}"
+            return f"&{self.dict_var[self.key]}|eq|{self.dict_var[self.key]}={self.value}"
         elif self.key == 'report_dest':
-            return f"{self.key}|eq|{self.key}={self.value[0], self.value[1]}"
+            return f"&{self.dict_var[self.key]}|eq|{self.dict_var[self.key]}={self.value}"
         elif self.key == 'current_port':
-            return f"{self.key}|begins||{self.key}={self.value[0], self.value[1]}"
+            return f"&{self.dict_var[self.key]}|begins||{self.dict_var[self.key]}={self.value}"
         return ""
 
 
@@ -56,11 +56,11 @@ class SliderFilter:
 
     def to_query(self):
         if self.key == 'latest_report':
-            return f"{self.key}|gte|{self.key}={self.value[0], self.value[1]}"
+            return f"&{self.key}|gte|{self.key}={self.value[0], self.value[1]}"
         elif self.key == 'course':
-            return f"{self.key}|range_circle|{self.key}={self.value[0], self.value[1]}"
+            return f"&{self.key}|range_circle|{self.key}={self.value[0], self.value[1]}"
         else:
-            return f"{self.key}|range|{self.key}={self.value[0], self.value[1]}"
+            return f"&{self.key}|range|{self.key}={self.value[0], self.value[1]}"
 
 
 class IntFilter:
@@ -104,7 +104,7 @@ class ListFilter:
         self.key = key
 
     def to_query(self):
-        return f"&{self.key}|{self.operator}|{self.key}={self.value}"
+        return f"&{self.dict_var[self.key]}|{self.operator}|{self.dict_var[self.key]}={self.value}"
 
 
 class Filters:
@@ -142,8 +142,15 @@ class Filters:
                 raise NotSupportedKeyError(key, list(self.possible_filters))
             self.filters.append(self.possible_filters[key](key, value))
 
-    def to_query(self):
+    def to_query(self, ignore_filter=None):
         res_str = ""
         for custom_filter in self.filters:
+            if ignore_filter is not None:
+                if isinstance(ignore_filter, str):
+                    if custom_filter.key is ignore_filter:
+                        continue
+                else:
+                    if custom_filter.key in ignore_filter:
+                        continue
             res_str += custom_filter.to_query()
         return res_str
