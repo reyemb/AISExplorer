@@ -1,6 +1,7 @@
 # AISExplorer
-AISExplorer can be used to locate vessels or to scrape all vessel in an AREA. 
-Also free proxies can be used out of the box.
+AISExplorer can be used to locate vessels or to scrape all vessel in an specific AREA. 
+Also free proxies can be used for scraping. Proxies will be scraped from https://www.sslproxies.org/, tested and used.
+Also Fallback are implemented
 
 ## Installation
 
@@ -13,11 +14,9 @@ pip install aisexplorer
 ### Find vessel by MMIS
 
 ```
-import aisexplorer
+from aisexplorer.AIS import AIS
 
-from ais_explorer.AIS import get_location
-
-get_location(211281610)
+AIS().get_location(211281610)
 ```
 
 ### Find vessels in Area
@@ -25,18 +24,41 @@ get_location(211281610)
 **maximum 500 vessels**
 
 ```
-import aisexplorer
+from aisexplorer.AIS import AIS
 
-from ais_explorer.AIS import get_area_data
+AIS(return_df= True).get_area_data("EMED")
 
-get_area_data("EMED", return_df= True)
+
 ```
 Output is limited to 500 rows.
 [Areas](https://help.marinetraffic.com/hc/en-us/articles/214556408-Areas-of-the-World-How-does-MarineTraffic-segment-them-) can be found here
 
+### Get Table via URL
+
+```
+from aisexplorer.AIS import AIS
+
+AIS(return_df = True).get_data_by_url("https://www.marinetraffic.com/en/data/?asset_type=vessels&columns=time_of_latest_position:desc,flag,shipname,photo,recognized_next_port,reported_eta,reported_destination,current_port,imo,ship_type,show_on_live_map,area,lat_of_latest_position,lon_of_latest_position,speed,length,width&area_in|in|West%20Mediterranean,East%20Mediterranean|area_in=WMED,EMED&time_of_latest_position_between|gte|time_of_latest_position_between=60,NaN")
+
+
+```
+
+
+### Use Proxies
+
+```
+from aisexplorer.AIS import AIS
+
+AIS(return_df = True, Proxy = True).get_data_by_url("https://www.marinetraffic.com/en/data/?asset_type=vessels&columns=time_of_latest_position:desc,flag,shipname,photo,recognized_next_port,reported_eta,reported_destination,current_port,imo,ship_type,show_on_live_map,area,lat_of_latest_position,lon_of_latest_position,speed,length,width&area_in|in|West%20Mediterranean,East%20Mediterranean|area_in=WMED,EMED&time_of_latest_position_between|gte|time_of_latest_position_between=60,NaN")
+
+
+```
+
+
 ## Next Steps
 
 - Add more potential proxy lists
+- Find a way to change the number of retrys
 
 ## Changelog
 

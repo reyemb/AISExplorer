@@ -31,27 +31,26 @@ def error_callback(retry_state):
 
 class AIS:
     retry_options = {
-        "stop": stop_after_attempt(7),
+        "stop": stop_after_attempt(10),
         "wait": wait_fixed(15),
         "after": before_retry,
         "retry_error_callback": error_callback
     }
-    def __init__(self, proxy=False, verbose=False, columns="all", columns_excluded=None,
-                 num_retries=7, seconds_wait=15, filter_config=None, return_df=False, return_total_count=False,
+    def __init__(self, proxy=False, verbose=False, columns="all", columns_excluded=None, print_query = False,
+                 num_retries=10, seconds_wait=15, filter_config=None, return_df=False, return_total_count=False,
                  **proxy_config):
         # Setting Retry Options
-        print(AIS.retry_options['stop'].max_attempt_number)
-        if num_retries != 7:
+        if num_retries != 10:
             AIS.retry_options['stop'] = stop_after_attempt(num_retries)
         if seconds_wait != 15:
             AIS.retry_options['wait'] = wait_fixed(seconds_wait)
-        print(AIS.retry_options['stop'].max_attempt_number)
 
         self.return_df = return_df
         self.return_total_count = return_total_count
         self.verbose = verbose
         self.columns = columns
         self.columns_excluded = columns_excluded
+        self.print_query = print_query
         self.session = requests.Session()
         if filter_config is not None:
             self.filters = Filters(**filter_config)
@@ -111,6 +110,10 @@ class AIS:
 
     def verbose_print(self, message):
         if self.verbose:
+            print(message)
+
+    def query_print(self, message):
+        if self.print_query:
             print(message)
 
     def check_proxy(self):
@@ -196,17 +199,18 @@ class AIS:
                       f"&area_in|in|{areas_long}|area_in={area_short}{self.filters.to_query(ignore_filter='global_area')}"
         referer_url = f"https://www.marinetraffic.com/en/data/?asset_type=vessels&columns={self.columns_url}" \
                       f"&area_in|in|{areas_long}|area_in={area_short}{self.filters.to_query(ignore_filter='global_area')}"
+        self.query_print(referer_url)
         return self.return_response(request_url, referer_url)
 
     @retry(**retry_options)
     def get_location(self, mmsi):
         if isinstance(mmsi, int):
             mmsi = str(mmsi)
-        filter_str = self.filters.to_query('')
         request_url = f"https://www.marinetraffic.com/en/reports?asset_type=vessels&columns={self.columns_url}" \
                       f"&mmsi|eq|mmsi={mmsi}{self.filters.to_query(ignore_filter='mmsi')}"
         referer_url = f"https://www.marinetraffic.com/en/data/?asset_type=vessels&columns={self.columns_url}" \
                       f"&mmsi|eq|mmsi={mmsi}{self.filters.to_query(ignore_filter='mmsi')}"
+        self.query_print(referer_url)
         return self.return_response(request_url, referer_url)
 
     @retry(**retry_options)
