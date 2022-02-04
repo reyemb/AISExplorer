@@ -218,6 +218,16 @@ class AIS:
         return self.return_response(request_url, referer_url)
 
     @retry(**retry_options)
+    def get_data(self):
+        request_url = f"https://www.marinetraffic.com/en/reports?asset_type=vessels&columns={self.columns_url}" \
+                      f"{self.filters.to_query()}"
+        referer_url = f"https://www.marinetraffic.com/en/data/?asset_type=vessels&columns={self.columns_url}" \
+                      f"{self.filters.to_query()}"
+        self.query_print("referer_url: " + referer_url)
+        self.query_print("request_url: " + request_url)
+        return self.return_response(request_url, referer_url)
+
+    @retry(**retry_options)
     def get_data_by_url(self, url):
         referer_url = url
         request_url = url.replace("data", "reports")
