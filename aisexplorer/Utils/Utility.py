@@ -23,6 +23,8 @@ def set_types_df(df):
         elif column in string_cols:
             df[column] = df[column].astype(str)
         elif column in unix_cols:
+            if column == "ETA":
+                df[column] = df[column].apply(lambda x: x if x != "masked" else None)
             df[column] = pd.to_numeric(df[column])
             df[column] = pd.to_datetime(df[column], unit="s")
         elif column in timestamp_cols:
