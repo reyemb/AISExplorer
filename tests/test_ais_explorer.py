@@ -17,12 +17,19 @@ from aisexplorer.Utils.Utility import set_types_df
 # Check filters
 print(Filters(latest_report= [360, 525600]).to_query())
 
-print(Filters(vessel_name="A").to_query(ignore_filter='vessel_name'))
+print(Filters(lon=[20,30]).to_query(ignore_filter='vessel_name'))
 
-df, total_count = AIS(verbose=True, return_df=True, return_total_count=True, print_query=True ,filter_config={
-    'vessel_name': 'A',
-    'latest_report': [360, 525600],
-}).get_area_data("WMED")
+ais = AIS(verbose=True, return_df=True, return_total_count=True, print_query=True)
+
+df, total_count = ais.get_area_data("WMED")
+
+print(df.iloc[0])
+
+ais.set_filters({'vessel_name': 'B'})
+
+df, total_count = ais.get_area_data("WMED")
+
+print(df.iloc[1])
 
 print(df)
 print(total_count)

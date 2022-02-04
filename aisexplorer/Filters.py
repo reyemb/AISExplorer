@@ -107,7 +107,7 @@ class ListFilter:
         self.key = key
 
     def to_query(self):
-        return f"&{self.dict_var[self.key]}|{self.operator}|{self.dict_var[self.key]}={self.value}"
+        return f"&{self.dict_var[self.key]}|{self.operator}|{self.value}|{self.dict_var[self.key]}={self.value}"
 
 
 class Filters:

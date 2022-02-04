@@ -37,7 +37,7 @@ class AIS:
         "retry_error_callback": error_callback
     }
     def __init__(self, proxy=False, verbose=False, columns="all", columns_excluded=None, print_query = False,
-                 num_retries=10, seconds_wait=15, filter_config=None, return_df=False, return_total_count=False,
+                 num_retries=10, seconds_wait=15, filter_config={}, return_df=False, return_total_count=False,
                  **proxy_config):
         # Setting Retry Options
         if num_retries != 10:
@@ -52,8 +52,7 @@ class AIS:
         self.columns_excluded = columns_excluded
         self.print_query = print_query
         self.session = requests.Session()
-        if filter_config is not None:
-            self.filters = Filters(**filter_config)
+        self.set_filters(filter_config)
         self.session.headers.update({
             'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:93.0) Gecko/20100101 Firefox/93.0',
             'Vessel-Image': '005bf958a6548a79c6d3a42eba493e339624',
@@ -71,6 +70,9 @@ class AIS:
             self.burned_proxies = []
         else:
             self.proxy = False
+
+    def set_filters(self, filter_config):
+        self.filters = Filters(**filter_config)
 
     def set_column_url(self):
         possible_columns = ["time_of_latest_position", "flag", "shipname", "photo", "recognized_next_port",
