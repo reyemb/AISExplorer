@@ -1,15 +1,21 @@
 import warnings
+import urllib
+
 from collections.abc import Iterable
-from aisexplorer.Exceptions import NotSupportedKeyError, NotSupportedKeyTypeError, NotSupportedArgumentType
+from aisexplorer.Exceptions import (
+    NotSupportedKeyError,
+    NotSupportedKeyTypeError,
+    NotSupportedArgumentType,
+)
 
 
 class StrFilter:
     dict_var = {
-        'vessel_name': 'shipname',
-        'destination_port': 'recognized_next_port_in',
-        'reported_dest': 'reported_destinations',
-        'callsign': 'callsign',
-        'current_port': 'current_port_in'
+        "vessel_name": "shipname",
+        "destination_port": "recognized_next_port_in",
+        "reported_dest": "reported_destinations",
+        "callsign": "callsign",
+        "current_port": "current_port_in",
     }
 
     def __init__(self, key, value):
@@ -19,31 +25,35 @@ class StrFilter:
         self.value = value
 
     def to_query(self):
-        if self.key == 'vessel_name':
+        if self.key == "vessel_name":
             return f"&{self.dict_var[self.key]}|begins|{self.dict_var[self.key]}={self.value}"
-        elif self.key == 'recognized_next_port_in':
+        elif self.key == "recognized_next_port_in":
             return f"&{self.dict_var[self.key]}|begins|{self.dict_var[self.key]}_name={self.value}"
-        elif self.key == 'callsign':
-            return f"&{self.dict_var[self.key]}|eq|{self.dict_var[self.key]}={self.value}"
-        elif self.key == 'report_dest':
-            return f"&{self.dict_var[self.key]}|eq|{self.dict_var[self.key]}={self.value}"
-        elif self.key == 'current_port':
+        elif self.key == "callsign":
+            return (
+                f"&{self.dict_var[self.key]}|eq|{self.dict_var[self.key]}={self.value}"
+            )
+        elif self.key == "report_dest":
+            return (
+                f"&{self.dict_var[self.key]}|eq|{self.dict_var[self.key]}={self.value}"
+            )
+        elif self.key == "current_port":
             return f"&{self.dict_var[self.key]}|begins||{self.dict_var[self.key]}={self.value}"
         return ""
 
 
 class SliderFilter:
     dict_var = {
-        'lon': 'lon_of_latest_position_between',
-        'lat': 'lat_of_latest_position_between',
-        'latest_report': 'time_of_latest_position_between',
-        'speed': 'speed_between',
-        'course': 'course_between',
-        'dwt': 'dwt_between',
-        'built': 'year_of_build_between',
-        'length': 'length_between',
-        'width': 'width_between',
-        'draught': 'draught_between'
+        "lon": "lon_of_latest_position_between",
+        "lat": "lat_of_latest_position_between",
+        "latest_report": "time_of_latest_position_between",
+        "speed": "speed_between",
+        "course": "course_between",
+        "dwt": "dwt_between",
+        "built": "year_of_build_between",
+        "length": "length_between",
+        "width": "width_between",
+        "draught": "draught_between",
     }
 
     def __init__(self, key, values):
@@ -55,9 +65,9 @@ class SliderFilter:
         self.value = [str(value) for value in values]
 
     def to_query(self):
-        if self.key == 'latest_report':
+        if self.key == "latest_report":
             return f"&{self.dict_var[self.key]}|gte|{self.dict_var[self.key]}={','.join(self.value)}"
-        elif self.key == 'course':
+        elif self.key == "course":
             return f"&{self.dict_var[self.key]}|range_circle|{self.dict_var[self.key]}={','.join(self.value)}"
         else:
             return f"&{self.dict_var[self.key]}|range|{self.dict_var[self.key]}={','.join(self.value)}"
@@ -65,9 +75,9 @@ class SliderFilter:
 
 class IntFilter:
     dict_var = {
-        'imo': '',
-        'emi': 'emi',
-        'mmsi': 'mmsi',
+        "imo": "",
+        "emi": "emi",
+        "mmsi": "mmsi",
     }
 
     def __init__(self, key, value):
@@ -82,60 +92,63 @@ class IntFilter:
 
 class ListFilter:
     dict_var = {
-        'flag': 'flag_in',
-        'vessel_type': 'ship_type_in',
-        'global_area': 'area_in',
-        'local_area': 'area_local_in',
-        'nav_status': 'navigational_status_in',
-        'current_port_country': 'current_port_country_in',
+        "flag": "flag_in",
+        "vessel_type": "ship_type_in",
+        "global_area": "area_in",
+        "local_area": "area_local_in",
+        "nav_status": "navigational_status_in",
+        "current_port_country": "current_port_country_in",
+        "fleets": "fleet_in",
     }
 
     def __init__(self, key, value):
-        if not isinstance(value, (list, dict)):
-            raise NotSupportedKeyTypeError(key, type(value), [list, dict])
+        if not isinstance(value, (list, dict, str)):
+            raise NotSupportedKeyTypeError(key, type(value), [list, dict, str])
         if isinstance(value, list):
-            warnings.warn("List has been given by default filter will filter all elements IN the list. If you want to "
-                          "to filter for elements which are not in the list use a dict instead")
+            warnings.warn(
+                "List has been given by default filter will filter all elements IN the list. If you want to "
+                "to filter for elements which are not in the list use a dict instead"
+            )
             self.value = value
             self.operator = "in"
         elif isinstance(value, str):
             self.value = value
             self.operator = "in"
         else:
-            self.value = value['values']
-            self.operator = value['operator']
+            self.value = value["values"]
+            self.operator = value["operator"]
         self.key = key
 
     def to_query(self):
         return f"&{self.dict_var[self.key]}|{self.operator}|{self.value}|{self.dict_var[self.key]}={self.value}"
 
-
 class Filters:
     possible_filters = {
-        'imo': IntFilter,
-        'emi': IntFilter,
-        'mmsi': IntFilter,
-        'vessel_name': StrFilter,
-        'callsign': StrFilter,
-        'current_port': StrFilter,
-        'reported_dest': StrFilter,
-        'destination_port': StrFilter,
-        'latest_report': SliderFilter,
-        'lat': SliderFilter,
-        'lon': SliderFilter,
-        'speed': SliderFilter,
-        'course': SliderFilter,
-        'dwt': SliderFilter,
-        'built': SliderFilter,
-        'length': SliderFilter,
-        'width': SliderFilter,
-        'draught': SliderFilter,
-        'flag': ListFilter,
-        'vessel_type': ListFilter,
-        'global_area': ListFilter,
-        'local_area': ListFilter,
-        'nav_status': ListFilter,
-        'current_port_country': ListFilter
+        "imo": IntFilter,
+        "emi": IntFilter,
+        "mmsi": IntFilter,
+        "vessel_name": StrFilter,
+        "callsign": StrFilter,
+        "current_port": StrFilter,
+        "reported_dest": StrFilter,
+        "destination_port": StrFilter,
+        "latest_report": SliderFilter,
+        "lat": SliderFilter,
+        "lon": SliderFilter,
+        "speed": SliderFilter,
+        "course": SliderFilter,
+        "dwt": SliderFilter,
+        "built": SliderFilter,
+        "length": SliderFilter,
+        "width": SliderFilter,
+        "draught": SliderFilter,
+        "flag": ListFilter,
+        "vessel_type": ListFilter,
+        "global_area": ListFilter,
+        "local_area": ListFilter,
+        "nav_status": ListFilter,
+        "current_port_country": ListFilter,
+        "fleets": ListFilter,
     }
 
     def __init__(self, **kwargs):
@@ -157,3 +170,18 @@ class Filters:
                         continue
             res_str += custom_filter.to_query()
         return res_str
+
+
+class FleetFilter:
+    def __init__(self, user_fleets):
+        self.user_fleets = user_fleets
+
+    def to_referer_query(self):
+        fleet_names = ",".join([urllib.parse.quote_plus(fleet[1]) for fleet in self.user_fleets])
+        fleet_ids = ",".join([urllib.parse.quote_plus(fleet[0]) for fleet in self.user_fleets])
+        return f"&fleet_in|in|{fleet_names}|fleet_in={fleet_ids}"
+        
+
+    def to_request_query(self):
+        fleet_ids = ",".join([urllib.parse.quote_plus(fleet[0]) for fleet in self.user_fleets])
+        return f"&fleet_in={fleet_ids}"    

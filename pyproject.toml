@@ -5,11 +5,11 @@ description = "Wrapper to fetch data from marinetraffic"
 readme = "README.md"
 homepage = "https://github.com/reyemb/AISExplorer"
 repository = "https://github.com/reyemb/AISExplorer"
-keywords = ["AIS", "Vessel", "Shiptracking","Shiplocation","Location","Proxy"]
+keywords = ["AIS", "Vessel", "Shiptracking","Shiplocation","Location","Proxy", "marinetraffic"]
 authors = ["reyemb <reyemb.coding@gmail.com>"]
 
 [tool.poetry.dependencies]
-python = "^3.6"
+python = "^3.7"
 pandas = "^1.3.4"
 requests = "^2.26.0"
 lxml = "^4.6.4"
@@ -18,6 +18,9 @@ tenacity = "^8.0.1"
 [tool.poetry.dev-dependencies]
 readme-renderer = "^30.0"
 jupyter = "^1.0.0"
+black = "^22.12.0"
+pip = "^22.3.1"
+python-dotenv = "^0.21.0"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
