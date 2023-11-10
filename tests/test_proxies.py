@@ -2,6 +2,7 @@ import unittest
 
 from aisexplorer.Proxy import FreeProxy
 
+
 class TestProxy(unittest.TestCase):
     def test_proxy(self):
         proxy = FreeProxy()
@@ -9,10 +10,10 @@ class TestProxy(unittest.TestCase):
 
     def test_proxy_list(self):
         proxy = FreeProxy()
-        proxy.get_proxy_list()
+        proxy.fetch_proxy_list()
         self.assertTrue(not proxy.proxies.empty)
 
     def test_proxy_list_len(self):
         proxy = FreeProxy()
-        proxy.get_proxy_list()
-        self.assertTrue(len(proxy.proxies)>0)
+        proxy.fetch_proxy_list()
+        self.assertTrue(len(proxy.proxies) > 0)

@@ -6,90 +6,68 @@ import requests
 import pandas as pd
 import collections
 import warnings
-
-from typing import Union
+from typing import Union, Iterable, Optional, Dict
 
 
 def check_valid_ip(string: str) -> bool:
-    valid = False
-    if "." in string:
-        elements_array = string.strip().split(".")
-        if len(elements_array) == 4:
-            for i in elements_array:
-                if i.isnumeric() and int(i) >= 0 and int(i) <= 255:
-                    valid = True
-                else:
-                    valid = False
-                    break
-    return valid
-
-
-dict_str = {
-    "yes": True,
-    "": False,
-    "no": False,
-}
+    """Check if a given string is a valid IP address."""
+    parts = string.strip().split(".")
+    return len(parts) == 4 and all(
+        part.isnumeric() and 0 <= int(part) <= 255 for part in parts
+    )
 
 
 def convert_str_to_bool(string: str) -> bool:
-    return dict_str.get(string)
+    """Convert a string to a boolean value based on predefined mappings."""
+    return {"yes": True, "": False, "no": False}.get(string, False)
 
 
-list_columns_to_clean = ["google", "https"]
-
-
-def clean_dataframe(df: pd.DataFrame):
-    for column in list_columns_to_clean:
-        if column in df.columns:
-            df[column] = df[column].apply(lambda x: convert_str_to_bool(x))
+def clean_dataframe_column(df: pd.DataFrame, column_name: str) -> pd.DataFrame:
+    """Clean a specific column in a DataFrame by converting strings to boolean values."""
+    if column_name in df.columns:
+        df[column_name] = df[column_name].apply(convert_str_to_bool)
     return df
 
 
 class FreeProxy:
+    """A class to manage fetching and filtering free proxy lists."""
+
     def __init__(
         self,
-        country: Union[str, collections.abc.Iterable] = None,
-        country_code: Union[str, collections.abc.Iterable] = None,
         timeout: float = 0.5,
-        anonym: Union[str, bool] = None,
         rand: bool = True,
-        https: Union[bool, str] = True,
-        prefered_country: Union[str, collections.abc.Iterable] = None,
-        prefered_country_code: Union[str, collections.abc.Iterable] = None,
+        https: bool = True,
         refresh_after: int = 900,
-        google: bool = False,
         verbose: bool = False,
+        **filters,
     ):
-        self.country = country
-        self.country_code = country_code
-        self.prefered_country = prefered_country
-        self.prefered_country_code = prefered_country_code
         self.timeout = timeout
-        self.anonym = anonym
-        self.https = https
         self.random = rand
+        self.https = https
+        self.refresh_after = refresh_after
+        self.verbose = verbose
+        self.filters = filters
         self.proxies = None
         self.fetched_at = None
-        self.refresh_after = refresh_after
         self.filtered_df = None
-        self.google = google
-        self.verbose = verbose
 
-    def verbose_print(self, message):
+    def verbose_print(self, message: str):
+        """Print a message if verbose mode is enabled."""
         if self.verbose:
             print(message)
 
-    def series_to_proxy(self, series) -> dict:
-        http_str = "https" if self.https else "http"
-        proxy_set = {http_str: f"{series.name}:{series['port']}"}
-        return proxy_set, series.name
+    def series_to_proxy(self, series: pd.Series) -> Dict[str, str]:
+        """Convert a series from a DataFrame to a proxy dictionary."""
+        protocol = "https" if self.https else "http"
+        return {protocol: f"{series.name}:{series['port']}"}
 
-    def get_proxy_list(self):
+    def fetch_proxy_list(self):
+        """Fetch the list of proxies from the web and clean the DataFrame."""
         try:
             page = requests.get("https://www.sslproxies.org")
             doc = lh.fromstring(page.content)
-            tr_elements = doc.xpath('//*[@id="list"]//tr')
             list_proxies = []
+            tr_elements = doc.xpath('//*[@id="list"]//tr')
             for tr_element in tr_elements:
                 if (
                     check_valid_ip(tr_element[0].text_content())
@@ -110,123 +88,70 @@ class FreeProxy:
                     ):
                         dict_tmp[attribute] = tr_element[counter].text_content()
                     list_proxies.append(dict_tmp)
-            self.proxies = pd.DataFrame(list_proxies)
-            self.proxies = self.proxies.set_index("ip_address")
-            self.proxies = clean_dataframe(self.proxies)
+            self.proxies = pd.DataFrame(list_proxies).set_index("ip_address")
+            self.proxies = clean_dataframe_column(self.proxies, "google")
+            self.proxies = clean_dataframe_column(self.proxies, "https")
             self.fetched_at = time.time()
         except requests.exceptions.RequestException as e:
             print(e)
             sys.exit(1)
 
-    @staticmethod
-    def get_filter_str(
-        country: Union[str, collections.abc.Iterable],
-        country_code: Union[str, collections.abc.Iterable],
-        anonymity: Union[str, collections.abc.Iterable],
-        https: bool,
-        google: bool,
-    ) -> str:
-        args = locals()
-        filter_str = ""
-        for arg in args:
-            if arg == "https" and args[arg] == "any":
-                continue
-            if args[arg] is not None:
-                if isinstance(args[arg], bool):
-                    filter_str += f"(self.proxies['{arg}'] == {args[arg]})&"
-                if isinstance(args[arg], str):
-                    filter_str += f"(self.proxies['{arg}'] == '{args[arg]}') & "
-                if isinstance(args[arg], collections.abc.Iterable) and not isinstance(
-                    args[arg], (bytes, str)
-                ):
-                    filter_str += f"(self.proxies['{arg}'].isin({args[arg]})) &"
-        if filter_str == "":
-            return ""
-        filter_str = filter_str[: len(filter_str) - 3] + filter_str[
-            len(filter_str) - 3 :
-        ].replace("&", "")
-        return f"self.proxies[{filter_str}]"
+    def get_filtered_proxies(self) -> pd.DataFrame:
+        """Filter the DataFrame of proxies based on the given filters."""
+        if self.proxies is None:
+            self.fetch_proxy_list()
+        elif time.time() - self.fetched_at >= self.refresh_after:
+            self.fetch_proxy_list()
 
-    def find_working_proxy(self) -> dict:
+        conditions = []
+        for key, value in self.filters.items():
+            if isinstance(value, bool):
+                conditions.append(f"(self.proxies['{key}'] == {value})")
+            elif isinstance(value, str):
+                conditions.append(f"(self.proxies['{key}'] == '{value}')")
+            elif isinstance(value, Iterable) and not isinstance(value, (str, bytes)):
+                conditions.append(f"(self.proxies['{key}'].isin({list(value)}))")
+
+        filter_str = " & ".join(conditions)
+        return self.proxies.query(filter_str) if filter_str else self.proxies
+
+    def find_working_proxy(self) -> Optional[Dict[str, str]]:
+        """Find a working proxy from the filtered DataFrame."""
+        self.filtered_df = self.get_filtered_proxies()
         if self.filtered_df.empty:
             return None
-        if self.random:
-            for i in range(len(self.filtered_df)):
-                random_proxy = self.filtered_df.loc[
-                    random.choice(list(self.filtered_df.index))
-                ]
-                random_proxy, ipaddress = self.series_to_proxy(random_proxy)
-                proxy = self.check_if_proxy_is_working(random_proxy)
-                if proxy:
-                    return proxy
-                else:
-                    self.filtered_df.drop(ipaddress, inplace=True)
-        else:
-            for proxy in self.filtered_df.index:
-                proxy_inner = self.filtered_df.loc[proxy]
-                proxy_inner, ipaddress = self.series_to_proxy(proxy_inner)
-                proxy_inner = self.check_if_proxy_is_working(proxy_inner)
-                if proxy_inner:
-                    return proxy_inner
 
-    def check_if_proxy_is_working(self, proxy) -> dict:
-        http_str = "https" if self.https else "http"
+        proxy_list = (
+            self.filtered_df.sample(frac=1) if self.random else self.filtered_df
+        )
+        for _, proxy_series in proxy_list.iterrows():
+            proxy = self.series_to_proxy(proxy_series)
+            if self.check_if_proxy_is_working(proxy):
+                return proxy
+        return None
+
+    def check_if_proxy_is_working(self, proxy: Dict[str, str]) -> bool:
+        """Check if a given proxy is working."""
+        protocol = "https" if self.https else "http"
         try:
-            with requests.get(
-                f"{http_str}://www.google.com",
+            r = requests.get(
+                f"{protocol}://github.com/reyemb/AISExplorer/",
                 proxies=proxy,
                 timeout=self.timeout,
-                stream=True,
-            ) as r:
-                if r.raw.connection.sock:
-                    if (
-                        r.raw.connection.sock.getpeername()[0]
-                        == proxy[http_str].split(":")[0]
-                    ):
-                        return proxy
-        except Exception:
+            )
+            self.verbose_print(f"Proxy {proxy} returned status code {r.status_code}")
+            return r.status_code == 200
+        except Exception as e:
+            self.verbose_print(f"Proxy {proxy} failed with exception {e}")
             return False
 
-    def get(self) -> dict:
-
-        if self.proxies is None:
-            self.get_proxy_list()
-        elif time.time() - self.fetched_at >= self.refresh_after:
-            self.get_proxy_list()
-
-        if self.prefered_country is not None or self.prefered_country_code is not None:
-            filter_str = self.get_filter_str(
-                self.prefered_country,
-                self.prefered_country_code,
-                self.anonym,
-                self.https,
-                self.google,
-            )
-        else:
-            filter_str = self.get_filter_str(
-                self.country, self.country_code, self.anonym, self.https, self.google
-            )
-
-        if filter_str != "":
-            exec(f"self.filtered_df = {filter_str}.copy()")
-        else:
-            self.filtered_df = self.proxies
-
+    def get(self) -> Optional[Dict[str, str]]:
+        """Get a working proxy."""
         working_proxy = self.find_working_proxy()
-        if working_proxy is not None:
+        if working_proxy:
             return working_proxy
 
-        warnings.warn(
-            "For the prefered country no working proxies have been found. Checking Countries. If countries is None all countries will be checked"
-        )
-        if self.prefered_country is not None or self.prefered_country_code is not None:
-            filter_str = self.get_filter_str(
-                self.country, self.country_code, self.anonym, self.https, self.google
-            )
-            if filter_str != "":
-                exec(f"self.filtered_df = {filter_str}.copy()")
-            else:
-                self.filtered_df = self.proxies
-            working_proxy = self.find_working_proxy()
-            if working_proxy is not None:
-                return working_proxy
+        warnings.warn("No working proxies found. Expanding search.")
+        self.filters.pop("prefered_country", None)
+        self.filters.pop("prefered_country_code", None)
+        return self.find_working_proxy()
