@@ -4,6 +4,7 @@ import urllib
 import collections
 import json
 import lxml.html as lh
+import warnings 
 
 from requests.exceptions import ConnectionError
 from aisexplorer.Exceptions import (
