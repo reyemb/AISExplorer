@@ -2,7 +2,6 @@
 
 ![PyPI](https://img.shields.io/pypi/v/AISExplorer)
 ![PyPI - Downloads](https://img.shields.io/pypi/dm/AISExplorer)
-![example workflow](https://github.com/reyemb/AISExplorer/actions/workflows/python-package.yml/badge.svg?style=for-the-badge)
 
 AISExplorer is a tool for locating vessels or scraping vessel data in a specific area. However, due to recent updates, the use of free proxies, previously scraped from sources like [sslproxies](https://www.sslproxies.org/), has been discontinued due to errors such as 403 Forbidden responses.
 
