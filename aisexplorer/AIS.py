@@ -20,16 +20,6 @@ from aisexplorer.Filters import Filters, FleetFilter
 from tenacity import retry, stop_after_attempt, wait_fixed
 
 
-def renew_proxy_and_retry(retry_state):
-    """Renew the proxy and print a retry message.
-
-    Args:
-        retry_state (tenacity.RetryCallState): The current state of the retry logic.
-    """
-    obj = retry_state.args[0]
-    obj.check_proxy()
-
-
 def raise_no_results_error(retry_state):
     """Raise a NoResultsError after a certain number of attempts.
 
@@ -67,7 +57,6 @@ class AIS:
     retry_options = {
         "stop": stop_after_attempt(10),
         "wait": wait_fixed(15),
-        "after": renew_proxy_and_retry,
         "retry_error_callback": raise_no_results_error,
     }
 
@@ -112,7 +101,7 @@ class AIS:
         self.session.headers.update(
             {
                 "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36",
-                "Vessel-Image": "001b6192a3cc77daab750f70cab85f527b18",
+                "Vessel-Image": "00b3ac45291acfd4e2e0dc4e46b24ec56c05",
             }
         )
         if proxy:
@@ -225,7 +214,7 @@ class AIS:
             "https://www.marinetraffic.com/en/search/fleetList",
             headers={
                 "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36",
-                "vessel-image": "001b6192a3cc77daab750f70cab85f527b18",
+                "vessel-image": "00b3ac45291acfd4e2e0dc4e46b24ec56c05",
                 "x-requested-with": "XMLHttpRequest",
             },
         )
@@ -611,9 +600,9 @@ class AIS:
             response = self.session.get(
                 request_url,
                 headers={
-                    # "Referer": referer_url,
-                    "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36",
-                    "vessel-image": "005bf958a6548a79c6d3a42eba493e339624",
+                    "Referer": referer_url,
+                    "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                    "vessel-image": "0026501dd5e7cae9b8afd72aa41a3f831929",
                     "x-requested-with": "XMLHttpRequest",
                 },
             )
